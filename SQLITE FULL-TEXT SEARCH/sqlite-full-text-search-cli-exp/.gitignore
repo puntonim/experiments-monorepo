@@ -1,0 +1,2 @@
+# Un-ignore the snowball lib compiled for macos.
+!vendored-requirements/**/*.dylib

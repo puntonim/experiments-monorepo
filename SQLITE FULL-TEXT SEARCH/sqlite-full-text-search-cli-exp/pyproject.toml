@@ -1,0 +1,50 @@
+[project]
+name = "fts-exp"
+description = "SQLite full-text search CLI experiment"
+version = "0.1.0"
+authors = [
+    {name = "puntonim",email = "puntonim@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "peewee (>=3.18.2,<4.0.0)",
+    "peewee-utils @ git+https://github.com/puntonim/utils-monorepo#subdirectory=peewee-utils",
+    "datetime-utils @ git+https://github.com/puntonim/utils-monorepo#subdirectory=datetime-utils",
+    "settings-utils @ git+https://github.com/puntonim/utils-monorepo#subdirectory=settings-utils",
+    "pydantic-utils @ git+https://github.com/puntonim/utils-monorepo#subdirectory=pydantic-utils",
+    "click (>=8.3.0,<9.0.0)",
+]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.group.dev.dependencies]
+black = "25.9.0"
+isort = "6.0.1"
+ipdb = "^0.13.13"
+
+[tool.poetry.group.test.dependencies]
+pytest = "^8.4.2"
+pytest-xdist = {extras = ["psutil"], version = "^3.8.0"}
+
+[tool.black]  # See: https://black.readthedocs.io/en/stable/pyproject_toml.html
+line-length = 88  # Default.
+# skip-string-normalization = true  # Only for old projects.
+target-version = ["py313"]
+include = '\.py?$'
+extend-exclude = '''  # It automatically excludes all files in .gitignore by default.
+/(
+    \.git
+  # Project-specific:
+  | docs
+)/
+'''
+
+[tool.isort]
+profile = "black"  # See: https://black.readthedocs.io/en/stable/guides/using_black_with_other_tools.html#profile
+skip_gitignore = true  # Skip all files in .gitignore.
+
+[project.scripts]
+sfts = "fts_exp.cli:cli"
