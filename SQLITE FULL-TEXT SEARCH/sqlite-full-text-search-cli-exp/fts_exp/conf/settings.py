@@ -35,8 +35,13 @@ class settings:
         / "fts5stemmer.dylib"
     )
 
+    # Separators used when performing a search with snippet() or highlight():
+    # https://docs.peewee-orm.com/en/latest/peewee/sqlite_ext.html#SearchField.snippet
     SQLITE_SEARCH_HIGHLIGHT_SEPARATOR_START = "<<"
     SQLITE_SEARCH_HIGHLIGHT_SEPARATOR_END = ">>"
+    # N. token returned when performing a search with snippet(), 1 - 64:
+    # https://docs.peewee-orm.com/en/latest/peewee/sqlite_ext.html#SearchField.snippet
+    SQLITE_SEARCH_SNIPPET_SIZE = 64
 
 
 class test_settings:

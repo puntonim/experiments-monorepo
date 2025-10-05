@@ -49,13 +49,15 @@ class ItemDomain:
             _ItemFTSIndex.select(
                 _ItemFTSIndex.rowid,
                 _ItemFTSIndex.bm25().alias("score"),
-                _ItemFTSIndex.title.highlight(
+                _ItemFTSIndex.title.snippet(
                     settings.SQLITE_SEARCH_HIGHLIGHT_SEPARATOR_START,
                     settings.SQLITE_SEARCH_HIGHLIGHT_SEPARATOR_END,
+                    max_tokens=settings.SQLITE_SEARCH_SNIPPET_SIZE,
                 ).alias("title_h"),
-                _ItemFTSIndex.notes.highlight(
+                _ItemFTSIndex.notes.snippet(
                     settings.SQLITE_SEARCH_HIGHLIGHT_SEPARATOR_START,
                     settings.SQLITE_SEARCH_HIGHLIGHT_SEPARATOR_END,
+                    max_tokens=settings.SQLITE_SEARCH_SNIPPET_SIZE,
                 ).alias("notes_h"),
             )
             .where(_ItemFTSIndex.match(text))
