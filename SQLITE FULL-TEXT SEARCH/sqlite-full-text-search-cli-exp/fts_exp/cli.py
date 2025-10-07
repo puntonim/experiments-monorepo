@@ -6,9 +6,13 @@ $ sfts --help
 
 import click
 
-from .views.create_item_cli_view import create_item_cli_view
+from .views.admin.admin_db_create_cli_view import admin_db_create_cli_view
+from .views.admin.admin_db_drop_tables_cli_view import admin_db_drop_tables_cli_view
+from .views.admin.admin_db_load_fixtures_cli_view import admin_db_load_fixtures_cli_view
+from .views.create_cli_view import create_cli_view
 from .views.health_cli_view import health_cli_view
-from .views.read_items_cli_view import read_items_cli_view
+from .views.read_cli_view import read_cli_view
+from .views.search_cli_view import search_cli_view
 
 
 @click.group(
@@ -26,5 +30,9 @@ def cli() -> None:
 
 # Register all sub-commands.
 cli.add_command(health_cli_view)
-cli.add_command(create_item_cli_view)
-cli.add_command(read_items_cli_view)
+cli.add_command(create_cli_view)
+cli.add_command(read_cli_view)
+cli.add_command(search_cli_view)
+cli.add_command(admin_db_create_cli_view)
+cli.add_command(admin_db_drop_tables_cli_view)
+cli.add_command(admin_db_load_fixtures_cli_view)

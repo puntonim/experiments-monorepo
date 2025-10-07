@@ -99,7 +99,7 @@ class TestCreateFtsIndex:
             assert ix.notes == item.notes
 
 
-class TestSearch:
+class TestSearchItems:
     def setup_method(self):
         self.domain = ItemDomain()
         self.items = [x for x in _create_items(TEST_DATA)]
@@ -107,19 +107,19 @@ class TestSearch:
 
     def test_eng_first(self):
         text = "first"
-        results = self.domain.search(text, LangEnum.ENG)
+        results = self.domain.search_items(text, LangEnum.ENG)
         assert len(results) == 2
         assert results[0].title_h == _highlight_token(TEST_DATA[1]["title"], "first")
         assert results[1].title_h == _highlight_token(TEST_DATA[0]["title"], "first")
 
     def test_eng_dentist(self):
         text = "dentist"
-        results = self.domain.search(text, LangEnum.ENG)
+        results = self.domain.search_items(text, LangEnum.ENG)
         assert len(results) == 0
 
     def test_eng_dentistsSTAR(self):
         text = "dentists*"
-        results = self.domain.search(text, LangEnum.ENG)
+        results = self.domain.search_items(text, LangEnum.ENG)
         assert len(results) == 1
         assert results[0].title_h == _highlight_token(
             TEST_DATA[1]["title"], "dentistry"
@@ -127,7 +127,7 @@ class TestSearch:
 
     def test_eng_leadsSTAR(self):
         text = "leads*"
-        results = self.domain.search(text, LangEnum.ENG)
+        results = self.domain.search_items(text, LangEnum.ENG)
         assert len(results) == 1
         assert results[0].title_h == _highlight_token(
             TEST_DATA[1]["title"], "leadership"
@@ -136,7 +136,7 @@ class TestSearch:
 
     def test_eng_archaeology(self):
         text = "archaeology"
-        results = self.domain.search(text, LangEnum.ENG)
+        results = self.domain.search_items(text, LangEnum.ENG)
         assert len(results) == 1
         assert results[0].notes_h == _highlight_token(
             TEST_DATA[1]["notes"], "archaeological"
@@ -144,32 +144,32 @@ class TestSearch:
 
     def test_ita_titolo(self):
         text = "titolo"
-        results = self.domain.search(text, LangEnum.ITA)
+        results = self.domain.search_items(text, LangEnum.ITA)
         assert len(results) == 2
         assert results[0].title_h == _highlight_token(TEST_DATA[2]["title"], "titolo")
         assert results[1].title_h == _highlight_token(TEST_DATA[3]["title"], "titoli")
 
     def test_ita_zampina(self):
         text = "zampina"
-        results = self.domain.search(text, LangEnum.ITA)
+        results = self.domain.search_items(text, LangEnum.ITA)
         assert len(results) == 1
         assert results[0].title_h == _highlight_token(TEST_DATA[2]["title"], "zampino")
 
     def test_ita_zampa(self):
         text = "zampa"
-        results = self.domain.search(text, LangEnum.ITA)
+        results = self.domain.search_items(text, LangEnum.ITA)
         assert len(results) == 0
 
     def test_ita_zampeSTAR(self):
         text = "zampe*"
-        results = self.domain.search(text, LangEnum.ITA)
+        results = self.domain.search_items(text, LangEnum.ITA)
         assert len(results) == 2
         assert results[0].notes_h == _highlight_token(TEST_DATA[2]["notes"], "zampino")
         assert results[1].notes_h == _highlight_token(TEST_DATA[3]["notes"], "zampette")
 
     def test_ita_dentista(self):
         text = "dentista"
-        results = self.domain.search(text, LangEnum.ITA)
+        results = self.domain.search_items(text, LangEnum.ITA)
         assert len(results) == 2
         assert results[0].title_h == _highlight_token(TEST_DATA[2]["title"], "dentista")
         assert results[1].title_h == _highlight_token(
@@ -178,7 +178,7 @@ class TestSearch:
 
     def test_ita_diventerebbe(self):
         text = "diventerebbe"
-        results = self.domain.search(text, LangEnum.ITA)
+        results = self.domain.search_items(text, LangEnum.ITA)
         assert len(results) == 1
         assert results[0].notes_h == _highlight_token(
             TEST_DATA[2]["notes"], "diventato"
@@ -186,7 +186,7 @@ class TestSearch:
 
     def test_ita_diventerò(self):
         text = "diventerò"
-        results = self.domain.search(text, LangEnum.ITA)
+        results = self.domain.search_items(text, LangEnum.ITA)
         assert len(results) == 1
         assert results[0].notes_h == _highlight_token(
             TEST_DATA[2]["notes"], "diventato"
@@ -194,14 +194,14 @@ class TestSearch:
 
     def test_ita_papa(self):
         text = "papa"
-        results = self.domain.search(text, LangEnum.ITA)
+        results = self.domain.search_items(text, LangEnum.ITA)
         assert len(results) == 2
         assert results[0].title_h == _highlight_token(TEST_DATA[2]["title"], "papà")
         assert results[1].title_h == _highlight_token(TEST_DATA[3]["title"], "Papa")
 
     def test_ita_papà(self):
         text = "papa"
-        results = self.domain.search(text, LangEnum.ITA)
+        results = self.domain.search_items(text, LangEnum.ITA)
         assert len(results) == 2
         assert results[0].title_h == _highlight_token(TEST_DATA[2]["title"], "papà")
         assert results[1].title_h == _highlight_token(TEST_DATA[3]["title"], "Papa")

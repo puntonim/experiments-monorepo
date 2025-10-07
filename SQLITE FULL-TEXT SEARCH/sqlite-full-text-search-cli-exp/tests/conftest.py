@@ -16,4 +16,5 @@ def use_db_fixture(test_settings_fixture):
     # `do_force_new_db_init` is required when running concurrent tests with in-memory
     #  SQLite db.
     with peewee_utils.use_db(do_force_new_db_init=True):
+        peewee_utils.create_all_tables()
         yield

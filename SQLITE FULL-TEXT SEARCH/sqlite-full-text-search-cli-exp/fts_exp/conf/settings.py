@@ -23,11 +23,15 @@ class settings:
 
     APP_NAME = "SQLite full-text search CLI experiment"
     IS_TEST = False
+    ARE_CONSOLE_LOGS_ENABLED = True
+    ARE_CONSOLE_PRINTS_ENABLED = True
 
     DB_PATH = settings_utils.get_string_from_env(
         "DB_PATH", str(ROOT_DIR / "fts-exp-db.sqlite3")
     )
-    DO_LOG_PEEWEE_QUERIES = False
+    DO_LOG_PEEWEE_QUERIES = settings_utils.get_bool_from_env(
+        "DO_LOG_PEEWEE_QUERIES", False
+    )
     SQLITE_EXT_SNOWBALL_MACOS_PATH = (
         ROOT_DIR
         / "vendored-requirements"
@@ -46,6 +50,8 @@ class settings:
 
 class test_settings:
     IS_TEST = True
+    ARE_CONSOLE_LOGS_ENABLED = False
+    ARE_CONSOLE_PRINTS_ENABLED = False
 
     DB_PATH = ":memory:"
     # DB_PATH = "test.sqlite3"

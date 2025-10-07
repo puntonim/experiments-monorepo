@@ -14,6 +14,7 @@ dependencies = [
     "settings-utils @ git+https://github.com/puntonim/utils-monorepo#subdirectory=settings-utils",
     "pydantic-utils @ git+https://github.com/puntonim/utils-monorepo#subdirectory=pydantic-utils",
     "click (>=8.3.0,<9.0.0)",
+    "rich (>=14.1.0,<15.0.0)",
 ]
 
 [build-system]

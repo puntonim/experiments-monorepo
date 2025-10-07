@@ -42,7 +42,7 @@ class ItemDomain:
         #  query (the same one) but it returns only the id of the new model.
         return _ItemFTSIndex.create(rowid=item.id, title=item.title, notes=item.notes)
 
-    def search(self, text: str, lang: LangEnum) -> peewee.ModelSelect:
+    def search_items(self, text: str, lang: LangEnum) -> peewee.ModelSelect:
         _ItemFTSIndex = get_index_class_for_lang(lang)
 
         query: peewee.ModelSelect = (
