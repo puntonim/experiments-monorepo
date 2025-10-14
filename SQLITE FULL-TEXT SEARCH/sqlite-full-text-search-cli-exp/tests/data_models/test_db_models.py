@@ -1,7 +1,7 @@
 from datetime import timedelta, timezone
 
 from fts_exp.conf import settings
-from fts_exp.data_models.db_models import ItemFTSIndexIta, ItemModel
+from fts_exp.data_models.db_models import ItemFTSIndexEng, ItemFTSIndexIta, ItemModel
 
 
 class TestItemModel:
@@ -57,15 +57,11 @@ class TestItemFTSIndexIta:
         assert ItemModel.select().count() == 2
 
     def test_create(self):
-        assert ItemFTSIndexIta.select().count() == 0
-        for item in ItemModel.select():
-            ItemFTSIndexIta.create(rowid=item.id, title=item.title, notes=item.notes)
+        # The index was automatically populated by the triggers.
         assert ItemFTSIndexIta.select().count() == 2
+        assert ItemFTSIndexEng.select().count() == 2
 
     def test_search(self):
-        for item in ItemModel.select():
-            ItemFTSIndexIta.create(rowid=item.id, title=item.title, notes=item.notes)
-
         text = "dente"
         query = (
             ItemFTSIndexIta.select(
@@ -75,12 +71,12 @@ class TestItemFTSIndexIta:
                     settings.SQLITE_SEARCH_HIGHLIGHT_SEPARATOR_START,
                     settings.SQLITE_SEARCH_HIGHLIGHT_SEPARATOR_END,
                     max_tokens=settings.SQLITE_SEARCH_SNIPPET_SIZE,
-                ).alias("title_h"),
+                ).alias("title_s"),
                 ItemFTSIndexIta.notes.snippet(
                     settings.SQLITE_SEARCH_HIGHLIGHT_SEPARATOR_START,
                     settings.SQLITE_SEARCH_HIGHLIGHT_SEPARATOR_END,
                     max_tokens=settings.SQLITE_SEARCH_SNIPPET_SIZE,
-                ).alias("notes_h"),
+                ).alias("notes_s"),
             )
             .where(ItemFTSIndexIta.match(text))
             .order_by(-ItemFTSIndexIta.bm25())

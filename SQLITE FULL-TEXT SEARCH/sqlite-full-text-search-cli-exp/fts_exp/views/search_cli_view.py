@@ -38,11 +38,11 @@ def search_cmd_view(text: str, lang: LangEnum) -> peewee.ModelSelect:
     items = domain.search_items(text, lang)
     for item in items:
         # TODO use output schema?
-        title = item.title_h.replace(
+        title = item.title_s.replace(
             settings.SQLITE_SEARCH_HIGHLIGHT_SEPARATOR_START,
             "[bold black on green_yellow]",
         ).replace(settings.SQLITE_SEARCH_HIGHLIGHT_SEPARATOR_END, "[/]")
-        notes = item.notes_h.replace(
+        notes = item.notes_s.replace(
             settings.SQLITE_SEARCH_HIGHLIGHT_SEPARATOR_START,
             "[bold black on green_yellow]",
         ).replace(settings.SQLITE_SEARCH_HIGHLIGHT_SEPARATOR_END, "[/]")

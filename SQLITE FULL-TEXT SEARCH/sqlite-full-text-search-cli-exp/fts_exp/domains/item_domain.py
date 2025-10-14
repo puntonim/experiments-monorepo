@@ -53,12 +53,12 @@ class ItemDomain:
                     settings.SQLITE_SEARCH_HIGHLIGHT_SEPARATOR_START,
                     settings.SQLITE_SEARCH_HIGHLIGHT_SEPARATOR_END,
                     max_tokens=settings.SQLITE_SEARCH_SNIPPET_SIZE,
-                ).alias("title_h"),
+                ).alias("title_s"),
                 _ItemFTSIndex.notes.snippet(
                     settings.SQLITE_SEARCH_HIGHLIGHT_SEPARATOR_START,
                     settings.SQLITE_SEARCH_HIGHLIGHT_SEPARATOR_END,
                     max_tokens=settings.SQLITE_SEARCH_SNIPPET_SIZE,
-                ).alias("notes_h"),
+                ).alias("notes_s"),
             )
             .where(_ItemFTSIndex.match(text))
             .order_by(-_ItemFTSIndex.bm25())

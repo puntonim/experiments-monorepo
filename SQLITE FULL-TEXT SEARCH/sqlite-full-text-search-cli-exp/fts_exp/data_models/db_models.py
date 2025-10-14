@@ -34,27 +34,49 @@ class ItemModel(peewee_utils.BasePeeweeModel):
 # Docs: https://www.sqlite.org/fts5.html
 # To check if FTS5 is enabled: FTS5Model.fts5_installed()
 class ItemFTSIndexIta(peewee_utils.BaseFtsModelModel):
+    """
+    Italian index table with external-content.
+    Docs:
+        https://sqlite.org/fts5.html#external_content_tables
+        https://docs.peewee-orm.com/en/latest/peewee/sqlite_ext.html#FTSModel
+    """
+
     _LANG = LangEnum.ITA
     rowid = sqlite_ext.RowIDField()  # Must be named `rowid`.
     title = sqlite_ext.SearchField()
     notes = sqlite_ext.SearchField()
 
     class Meta:
-        # Disable `remove_diacritics` or "diventerò" does not match "diventate".
-        options = {"tokenize": "snowball italian unicode61 remove_diacritics 0"}
+        options = {
+            # Disable `remove_diacritics` or "diventerò" does not match "diventate".
+            "tokenize": "snowball italian unicode61 remove_diacritics 0",
+            # External-content.
+            "content": ItemModel,
+        }
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(rowid={self.rowid!r}, title={self.title!r})"
 
 
 class ItemFTSIndexEng(peewee_utils.BaseFtsModelModel):
+    """
+    English index table with external-content.
+    Docs:
+        https://sqlite.org/fts5.html#external_content_tables
+        https://docs.peewee-orm.com/en/latest/peewee/sqlite_ext.html#FTSModel
+    """
+
     _LANG = LangEnum.ENG
     rowid = sqlite_ext.RowIDField()  # Must be named `rowid`.
     title = sqlite_ext.SearchField()
     notes = sqlite_ext.SearchField()
 
     class Meta:
-        options = {"tokenize": "snowball english unicode61 remove_diacritics 2"}
+        options = {
+            "tokenize": "snowball english unicode61 remove_diacritics 2",
+            # External-content.
+            "content": ItemModel,
+        }
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(rowid={self.rowid!r}, title={self.title!r})"
@@ -80,7 +102,7 @@ peewee_utils.register_sql_function(
     0,
 )
 
-# Register a trigger to update Activity.updated_at on every update.
+# Register a trigger to update **Activity.updated_at** on every update.
 # Update trigger: https://stackoverflow.com/questions/30780722/sqlite-and-recursive-triggers
 # STRFTIME for timestamp with milliseconds: https://stackoverflow.com/questions/17574784/sqlite-current-timestamp-with-milliseconds
 peewee_utils.register_trigger(
@@ -95,6 +117,43 @@ BEGIN
 END;
 """
 )
+
+# Register triggers to keep **ItemFTSIndexIta** automatically updated with ItemModel.
+# Docs: https://sqlite.org/fts5.html#external_content_tables
+peewee_utils.register_trigger(
+    """
+CREATE TRIGGER IF NOT EXISTS update_itemftsindexita_after_insert_on_item
+AFTER INSERT ON item
+FOR EACH ROW
+BEGIN
+    INSERT INTO itemftsindexita(rowid, title, notes) VALUES (new.id, new.title, new.notes);
+END;
+"""
+)
+peewee_utils.register_trigger(
+    """
+CREATE TRIGGER IF NOT EXISTS update_itemftsindexita_after_delete_on_item
+AFTER DELETE ON item
+FOR EACH ROW
+BEGIN
+    INSERT INTO itemftsindexita(itemftsindexita, rowid, title, notes) VALUES('delete', old.id, old.title, old.notes);
+END;
+"""
+)
+peewee_utils.register_trigger(
+    """
+CREATE TRIGGER IF NOT EXISTS update_itemftsindexita_after_update_on_item
+AFTER UPDATE ON item
+FOR EACH ROW
+BEGIN
+    INSERT INTO itemftsindexita(itemftsindexita, rowid, title, notes) VALUES('delete', old.id, old.title, old.notes);
+    INSERT INTO itemftsindexita(rowid, title, notes) VALUES (new.id, new.title, new.notes);
+END;
+"""
+)
+
+# TODO add triggers for **ItemFTSIndexEng**.
+
 
 # At last, configure peewee_utils with the SQLite DB path.
 # Using lambda functions, instead of actual values, for lazy init, which is necessary
