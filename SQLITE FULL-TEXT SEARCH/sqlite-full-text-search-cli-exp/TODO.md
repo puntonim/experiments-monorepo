@@ -1,10 +1,5 @@
-- Models and indexes:
-  - add Item.lang
-  - the triggers should sync the index tables but not both langs, only the one with the 
-      correct lang: use the WHEN condition https://sqlite.org/lang_createtrigger.html
-  - write proper tests for models
-
 - output schema in CLI views with console.print(), search "TODO use output schema?"
+- test cli and test domain
 - `admin-db-run-migrations` CLI
 
 - Read all this: https://sqlite.org/fts5.html

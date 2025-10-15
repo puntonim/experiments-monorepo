@@ -8,7 +8,7 @@ Index tables **with content** ot with **external-content**
 
 Docs on external-content: https://sqlite.org/fts5.html#external_content_tables
 
-Index tables can be **with content** or with **external-content**.
+Index tables can be **with content** or with **external-content** (or contentless).
  - Index tables with content duplicate the content (all the indexed cols) of the
     original table (by creating a new extra table with the original content).
  - While index tables with external-content do not, but instead when the search returns

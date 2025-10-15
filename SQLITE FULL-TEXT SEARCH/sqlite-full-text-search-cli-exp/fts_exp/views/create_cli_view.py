@@ -48,8 +48,7 @@ def create_cmd_view(
     title: str, notes: str, lang: LangEnum
 ) -> tuple[ItemModel, ItemFTSIndexEng | ItemFTSIndexIta]:
     domain = ItemDomain()
-    item = domain.create_item(CreateItemSchema(title=title, notes=notes))
-    ix = domain.create_fts_index_for_item(item, lang)
+    item = domain.create_item(CreateItemSchema(title=title, notes=notes, lang=lang))
     # TODO use output schema?
-    console.print(f"Created item id={item.id} and its index")
-    return item, ix
+    console.print(f"Created item id={item.id}")
+    return item

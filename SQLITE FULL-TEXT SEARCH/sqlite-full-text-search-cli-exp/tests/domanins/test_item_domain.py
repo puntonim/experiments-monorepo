@@ -2,14 +2,12 @@ from typing import Sequence
 
 from fts_exp.conf import settings
 from fts_exp.data_models.db_models import (
-    ItemFTSIndexEng,
-    ItemFTSIndexIta,
     ItemModel,
     LangEnum,
 )
 from fts_exp.domains.item_domain import CreateItemSchema, ItemDomain
 
-TEST_DATA = [
+TEST_DATA_ENG = [
     dict(
         title="My first title",
         notes="My first note",
@@ -17,9 +15,12 @@ TEST_DATA = [
     ),
     dict(
         title="My first books were about dentistry and leadership",
-        notes="My first note is a lead to possibly archaeological things",
+        notes="My first note is a lead to possibly archaeological things in the computer",
         lang=LangEnum.ENG,
     ),
+]
+
+TEST_DATA_ITA = [
     dict(
         title="Il primo titolo di papà: tanto va la gatta al lardo che ci lascia lo zampino",
         notes="La prima nota è che il dente sta dal dentista diventato anche quello di mio zio",
@@ -27,10 +28,12 @@ TEST_DATA = [
     ),
     dict(
         title="I secondi titoli del santo Papa: lardi ecumenici su zampette",
-        notes="I denti sani sono della zia dentistica",
+        notes="I denti sani sono della zia dentistica al computer",
         lang=LangEnum.ITA,
     ),
 ]
+
+TEST_DATA = TEST_DATA_ENG + TEST_DATA_ITA
 
 
 def _create_items(test_data: Sequence[dict]):
@@ -38,14 +41,7 @@ def _create_items(test_data: Sequence[dict]):
         yield ItemModel.create(
             title=test_datum["title"],
             notes=test_datum["notes"],
-        )
-
-
-def _create_indices(test_data: Sequence[dict]):
-    items = ItemDomain().read_items()
-    for item in items:
-        yield ItemDomain().create_fts_index_for_item(
-            item, lang=test_data[item.id - 1]["lang"]
+            lang=test_datum["lang"],
         )
 
 
@@ -83,27 +79,13 @@ class TestReadAllItems:
         assert items.count() == len(TEST_DATA)
 
 
-class TestCreateFtsIndex:
-    def setup_method(self):
-        self.items = [x for x in _create_items(TEST_DATA)]
-
-    def test_happy_flow(self):
-        items = ItemDomain().read_items()
-        assert items.count() == len(TEST_DATA)
-        for item in items:
-            ix = ItemDomain().create_fts_index_for_item(
-                item, lang=TEST_DATA[item.id - 1]["lang"]
-            )
-            assert ix.rowid == item.id
-            assert ix.title == item.title
-            assert ix.notes == item.notes
-
-
 class TestSearchItems:
+    # Light testing the actual full-text search feature as it is heavily tested in
+    #  test_db_models_search.py.
+
     def setup_method(self):
         self.domain = ItemDomain()
         self.items = [x for x in _create_items(TEST_DATA)]
-        self.indices = [x for x in _create_indices(TEST_DATA)]
 
     def test_eng_first(self):
         text = "first"
@@ -111,28 +93,6 @@ class TestSearchItems:
         assert len(results) == 2
         assert results[0].title_s == _highlight_token(TEST_DATA[1]["title"], "first")
         assert results[1].title_s == _highlight_token(TEST_DATA[0]["title"], "first")
-
-    def test_eng_dentist(self):
-        text = "dentist"
-        results = self.domain.search_items(text, LangEnum.ENG)
-        assert len(results) == 0
-
-    def test_eng_dentistsSTAR(self):
-        text = "dentists*"
-        results = self.domain.search_items(text, LangEnum.ENG)
-        assert len(results) == 1
-        assert results[0].title_s == _highlight_token(
-            TEST_DATA[1]["title"], "dentistry"
-        )
-
-    def test_eng_leadsSTAR(self):
-        text = "leads*"
-        results = self.domain.search_items(text, LangEnum.ENG)
-        assert len(results) == 1
-        assert results[0].title_s == _highlight_token(
-            TEST_DATA[1]["title"], "leadership"
-        )
-        assert results[0].notes_s == _highlight_token(TEST_DATA[1]["notes"], "lead")
 
     def test_eng_archaeology(self):
         text = "archaeology"
@@ -142,39 +102,12 @@ class TestSearchItems:
             TEST_DATA[1]["notes"], "archaeological"
         )
 
-    def test_ita_titolo(self):
-        text = "titolo"
-        results = self.domain.search_items(text, LangEnum.ITA)
-        assert len(results) == 2
-        assert results[0].title_s == _highlight_token(TEST_DATA[2]["title"], "titolo")
-        assert results[1].title_s == _highlight_token(TEST_DATA[3]["title"], "titoli")
-
-    def test_ita_zampina(self):
-        text = "zampina"
-        results = self.domain.search_items(text, LangEnum.ITA)
-        assert len(results) == 1
-        assert results[0].title_s == _highlight_token(TEST_DATA[2]["title"], "zampino")
-
-    def test_ita_zampa(self):
-        text = "zampa"
-        results = self.domain.search_items(text, LangEnum.ITA)
-        assert len(results) == 0
-
     def test_ita_zampeSTAR(self):
         text = "zampe*"
         results = self.domain.search_items(text, LangEnum.ITA)
         assert len(results) == 2
         assert results[0].notes_s == _highlight_token(TEST_DATA[2]["notes"], "zampino")
         assert results[1].notes_s == _highlight_token(TEST_DATA[3]["notes"], "zampette")
-
-    def test_ita_dentista(self):
-        text = "dentista"
-        results = self.domain.search_items(text, LangEnum.ITA)
-        assert len(results) == 2
-        assert results[0].title_s == _highlight_token(TEST_DATA[2]["title"], "dentista")
-        assert results[1].title_s == _highlight_token(
-            TEST_DATA[3]["title"], "dentistica"
-        )
 
     def test_ita_diventerebbe(self):
         text = "diventerebbe"
@@ -183,25 +116,3 @@ class TestSearchItems:
         assert results[0].notes_s == _highlight_token(
             TEST_DATA[2]["notes"], "diventato"
         )
-
-    def test_ita_diventerò(self):
-        text = "diventerò"
-        results = self.domain.search_items(text, LangEnum.ITA)
-        assert len(results) == 1
-        assert results[0].notes_s == _highlight_token(
-            TEST_DATA[2]["notes"], "diventato"
-        )
-
-    def test_ita_papa(self):
-        text = "papa"
-        results = self.domain.search_items(text, LangEnum.ITA)
-        assert len(results) == 2
-        assert results[0].title_s == _highlight_token(TEST_DATA[2]["title"], "papà")
-        assert results[1].title_s == _highlight_token(TEST_DATA[3]["title"], "Papa")
-
-    def test_ita_papà(self):
-        text = "papa"
-        results = self.domain.search_items(text, LangEnum.ITA)
-        assert len(results) == 2
-        assert results[0].title_s == _highlight_token(TEST_DATA[2]["title"], "papà")
-        assert results[1].title_s == _highlight_token(TEST_DATA[3]["title"], "Papa")
