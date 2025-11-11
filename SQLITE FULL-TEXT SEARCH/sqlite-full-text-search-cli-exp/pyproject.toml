@@ -1,6 +1,6 @@
 [project]
 name = "fts-exp"
-description = "SQLite full-text search CLI experiment"
+description = "Experiments Monorepo: SQLite full-text search CLI experiment"
 version = "0.1.0"
 authors = [
     {name = "puntonim",email = "puntonim@gmail.com"}

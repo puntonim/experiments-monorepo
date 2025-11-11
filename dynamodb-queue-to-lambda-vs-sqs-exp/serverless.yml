@@ -1,0 +1,329 @@
+# Serverless version 4.23.0.
+
+# Docs:
+#  - Serverless for AWS full specs: https://www.serverless.com/framework/docs/providers/aws/guide/serverless.yml/
+#  - Python reqs: https://www.serverless.com/framework/docs/providers/aws/guide/python
+#  - IAM: https://www.serverless.com/framework/docs/providers/aws/guide/iam
+#  - IAM Roles Per Function: https://www.serverless.com/framework/docs/providers/aws/guide/iam
+
+
+service: ddbq-exp
+
+
+provider:
+  name: aws
+  runtime: python3.13
+  region: eu-south-1
+  stage: prod # Default stage to be used. If omitted the default is `dev`. Override with `sls deploy --stage prod`.
+  memorySize: 256 # Default is 1024.
+  timeout: 15 # Default is 6 seconds. Note: API Gateway current maximum is 30 seconds.
+  logRetentionInDays: 90 # Set the default RetentionInDays for a CloudWatch LogGroup. Default is never expire.
+  environment: # Env vars. Use it also for secrets in Parameter Store and - if this project has Dynaconf - config to override those in `settings_default.toml`.
+    # Note: it's better to store all env vars here rather than nested under `functions:`
+    #  so they are available to all Lambdas and to the `/settings` introspection endpoint.
+    # Some are from ssm Parameter Store: https://www.serverless.com/framework/docs/providers/aws/guide/variables#reference-variables-using-the-ssm-parameter-store
+    # API_AUTHORIZER_TOKEN: ${env:API_AUTHORIZER_TOKEN, ssm:/botte-be/${sls:stage}/api-authorizer-token, 'XXX'}
+  tags: # CloudFormation tags to apply to Lambdas and everything that supports them.
+    project: ${self:service}
+    environment: ${sls:stage}
+    managed-with: Serverless framework
+    monorepo: https://github.com/puntonim/botte-monorepo
+    source: ${self:custom.source}
+  stackTags: ${self:provider.tags}
+  deploymentBucket:
+    blockPublicAccess: true # Prevent public access via ACLs or bucket policies. Default is false.
+    tags: ${self:provider.tags} # Tags to add to each of the deployment resources.
+  layers:
+    # The order of layers matters as they override each other's common files.
+    # So keep you actual requirements layer as the last layer in the list,
+    #  but right before the vendored layer, if you have any.
+    #
+    # Powertools for AWS Lambda (Python): https://docs.powertools.aws.dev/lambda/python/latest/.
+    - arn:aws:lambda:${self:provider.region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-x86_64:18
+    # All requirements packaged by `serverless-python-requirements` plugin.
+    - Ref: PythonRequirementsLambdaLayer
+
+
+functions:
+  dynamodb-parallel:
+    handler: ddbq_exp.dynamodb_parallel_view.lambda_handler
+    timeout: 28
+    maximumRetryAttempts: 0
+    events:
+      # This stream is an AWS::Lambda::EventSourceMapping.
+      # Docs:
+      #  - https://www.serverless.com/framework/docs/providers/aws/events/streams
+      #  - https://docs.aws.amazon.com/lambda/latest/dg/with-ddb.html
+      #  - https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-lambda-eventsourcemapping.html
+      - stream:
+          type: dynamodb
+          arn: !GetAtt DynamodbTaskTable.StreamArn # Created down here in `resources`.
+          filterPatterns:
+            # Only INSERT events (not UPDATE, DELETE, etc) where TaskId=DDBQ_EXP_PARALLEL.
+            - eventName: [INSERT]
+              dynamodb:
+                NewImage:
+                  TaskId:
+                    S: [DDBQ_EXP_PARALLEL]
+          startingPosition: LATEST
+          # Config for test #1.
+          batchSize: 1 # Max batch size.
+          batchWindow: 0 # Seconds to wait (while collecting the batch) before invoking Lambda.
+          # Config for test #2.
+          #batchSize: 100
+          #batchWindow: 10
+          maximumRetryAttempts: 0
+          parallelizationFactor: 10 # Max 10 concurrent Lambdas per shard (10 is the max).
+          enabled: true
+          destinations:
+            # Send discarded records, after maximumRetryAttempts, to aws-watchdog (that
+            #  sends emails to me).
+            # Note: I tested this by adding a 1/0 in the source code of the view and
+            #  received both the log from aws-watchdog and the failed DynamoDB event.
+            #  Note: I also tried to test failed invocations by manually deleting the
+            #  Lambda from AWS web console after having deployed this Serverless file,
+            #  but it did not work. I also tried to test it by changing this settings in
+            #  AWS web console: Configuration > Concurrency > Reserved concurrency to 0
+            #  but it did not work, the Lambda did not get invoked and no msg sent
+            #  to DLQ.
+            # Docs: https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-properties-lambda-eventsourcemapping-destinationconfig.html
+            onFailure:
+              arn: ${self:custom.awsWatchdogSnsErrorsArn}
+              type: sns
+    iam:
+      role:
+        statements:
+          # Allow publishing SNS messages to aws-watchdog SNS (that sends emails to me).
+          - Effect: Allow
+            Action:
+              - sns:Publish
+            Resource: ${self:custom.awsWatchdogSnsErrorsArn}
+          # Allow operations on the S3 bucket.
+          - Effect: Allow
+            Action:
+              - s3:PutObject
+            Resource: !Sub ${S3Bucket.Arn}/*
+    # DLQ only for ASYNC invocations: set, as DLQ, the SNS topic in aws-watchdog that
+    #  sends emails to me.
+    # Note: Lambda sync/async invocations examples:
+    #  - ASYNC: S3, SNS, SQS, CloudWatch Logs, EventBridge Scheduler, aws cli, etc.
+    #  - SYNC: API Gateway, aws cli, etc.
+    onError: ${self:custom.awsWatchdogSnsErrorsArn}
+
+  dynamodb-order:
+    handler: ddbq_exp.dynamodb_order_view.lambda_handler
+    timeout: 28
+    maximumRetryAttempts: 0
+    events:
+      # This stream is an AWS::Lambda::EventSourceMapping.
+      # Docs:
+      #  - https://www.serverless.com/framework/docs/providers/aws/events/streams
+      #  - https://docs.aws.amazon.com/lambda/latest/dg/with-ddb.html
+      #  - https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-lambda-eventsourcemapping.html
+      - stream:
+          type: dynamodb
+          arn: !GetAtt DynamodbTaskTable.StreamArn # Created down here in `resources`.
+          filterPatterns:
+            # Only INSERT events (not UPDATE, DELETE, etc) where TaskId=DDBQ_EXP_PARALLEL.
+            - eventName: [INSERT]
+              dynamodb:
+                NewImage:
+                  TaskId:
+                    S: [DDBQ_EXP_ORDER]
+          startingPosition: LATEST
+          batchSize: 1 # Max batch size.
+          batchWindow: 0 # Seconds to wait (while collecting the batch) before invoking Lambda.
+          maximumRetryAttempts: 0
+          parallelizationFactor: 10 # Max 10 concurrent Lambdas per shard (10 is the max).
+          enabled: true
+          destinations:
+            # Send discarded records, after maximumRetryAttempts, to aws-watchdog (that
+            #  sends emails to me).
+            # Note: I tested this by adding a 1/0 in the source code of the view and
+            #  received both the log from aws-watchdog and the failed DynamoDB event.
+            #  Note: I also tried to test failed invocations by manually deleting the
+            #  Lambda from AWS web console after having deployed this Serverless file,
+            #  but it did not work. I also tried to test it by changing this settings in
+            #  AWS web console: Configuration > Concurrency > Reserved concurrency to 0
+            #  but it did not work, the Lambda did not get invoked and no msg sent
+            #  to DLQ.
+            # Docs: https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-properties-lambda-eventsourcemapping-destinationconfig.html
+            onFailure:
+              arn: ${self:custom.awsWatchdogSnsErrorsArn}
+              type: sns
+    iam:
+      role:
+        statements:
+          # Allow publishing SNS messages to aws-watchdog SNS (that sends emails to me).
+          - Effect: Allow
+            Action:
+              - sns:Publish
+            Resource: ${self:custom.awsWatchdogSnsErrorsArn}
+          # Allow operations on the S3 bucket.
+          - Effect: Allow
+            Action:
+              - s3:PutObject
+            Resource: !Sub ${S3Bucket.Arn}/*
+    # DLQ only for ASYNC invocations: set, as DLQ, the SNS topic in aws-watchdog that
+    #  sends emails to me.
+    # Note: Lambda sync/async invocations examples:
+    #  - ASYNC: S3, SNS, SQS, CloudWatch Logs, EventBridge Scheduler, aws cli, etc.
+    #  - SYNC: API Gateway, aws cli, etc.
+    onError: ${self:custom.awsWatchdogSnsErrorsArn}
+
+  dynamodb-retry:
+    handler: ddbq_exp.dynamodb_retry_view.lambda_handler
+    timeout: 28
+    maximumRetryAttempts: 0
+    events:
+      # This stream is an AWS::Lambda::EventSourceMapping.
+      # Docs:
+      #  - https://www.serverless.com/framework/docs/providers/aws/events/streams
+      #  - https://docs.aws.amazon.com/lambda/latest/dg/with-ddb.html
+      #  - https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-lambda-eventsourcemapping.html
+      - stream:
+          type: dynamodb
+          arn: !GetAtt DynamodbTaskTable.StreamArn # Created down here in `resources`.
+          filterPatterns:
+            # Only INSERT events (not UPDATE, DELETE, etc) where TaskId=DDBQ_EXP_RETRY.
+            - eventName: [INSERT]
+              dynamodb:
+                NewImage:
+                  TaskId:
+                    S: [DDBQ_EXP_RETRY]
+          startingPosition: LATEST
+          batchSize: 100 # Max batch size.
+          batchWindow: 3 # Seconds to wait (while collecting the batch) before invoking Lambda.
+          maximumRetryAttempts: 7
+          parallelizationFactor: 10 # Max 10 concurrent Lambdas per shard (10 is the max).
+          enabled: true
+          destinations:
+            # Send discarded records, after maximumRetryAttempts, to aws-watchdog (that
+            #  sends emails to me).
+            # Note: I tested this by adding a 1/0 in the source code of the view and
+            #  received both the log from aws-watchdog and the failed DynamoDB event.
+            #  Note: I also tried to test failed invocations by manually deleting the
+            #  Lambda from AWS web console after having deployed this Serverless file,
+            #  but it did not work. I also tried to test it by changing this settings in
+            #  AWS web console: Configuration > Concurrency > Reserved concurrency to 0
+            #  but it did not work, the Lambda did not get invoked and no msg sent
+            #  to DLQ.
+            # Docs: https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-properties-lambda-eventsourcemapping-destinationconfig.html
+            onFailure:
+              arn: ${self:custom.awsWatchdogSnsErrorsArn}
+              type: sns
+    iam:
+      role:
+        statements:
+          # Allow publishing SNS messages to aws-watchdog SNS (that sends emails to me).
+          - Effect: Allow
+            Action:
+              - sns:Publish
+            Resource: ${self:custom.awsWatchdogSnsErrorsArn}
+          # Allow operations on the S3 bucket.
+          - Effect: Allow
+            Action:
+              - s3:PutObject
+              - s3:GetObject
+              - s3:ListBucket
+            Resource:
+              - !GetAtt S3Bucket.Arn
+              - !Sub ${S3Bucket.Arn}/*
+    # DLQ only for ASYNC invocations: set, as DLQ, the SNS topic in aws-watchdog that
+    #  sends emails to me.
+    # Note: Lambda sync/async invocations examples:
+    #  - ASYNC: S3, SNS, SQS, CloudWatch Logs, EventBridge Scheduler, aws cli, etc.
+    #  - SYNC: API Gateway, aws cli, etc.
+    onError: ${self:custom.awsWatchdogSnsErrorsArn}
+
+
+package:
+  # `individually: true` should only be used for a project with multiple modules each with their own specific dependencies.
+  #  Docs: https://www.serverless.com/plugins/serverless-python-requirements#per-function-requirements
+  individually: false
+  patterns: # Specify the directories and files which should be included in the deployment package. Order matters.
+    - "!**"
+    - ddbq_exp/**
+    - "!**/__pycache__/**"
+    - pyproject.toml
+    - serverless.yml
+
+
+custom:
+  # Constants.
+  source: https://github.com/puntonim/experiments-monorepo/blob/main/dynamodb-queue-to-lambda-vs-sqs-exp/serverless.yml
+  # SNS and SQS DLQs in aws-watchdog (always prefer SNS, when possible).
+  awsWatchdogSqsErrorsArn: arn:aws:sqs:eu-south-1:477353422995:aws-watchdog-errors-prod
+  awsWatchdogSnsErrorsArn: arn:aws:sns:eu-south-1:477353422995:aws-watchdog-errors-prod
+
+  # Plugin: serverless-python-requirements.
+  pythonRequirements:
+    # With the layer option, a new layer is created with the naming convention ${self:service}-${sls:stage}-python-requirements.
+    layer: True
+    slim: true # Strip the .so files, remove __pycache__, etc. See: https://www.serverless.com/plugins/serverless-python-requirements.
+    # When deploying from local dev machine, it's important to disable useStaticCache, useDownloadCache and pip cache
+    #  in order to ensure that local libs (like `events`) are always rebuilt.
+    useStaticCache: false
+    useDownloadCache: false
+    # Use `--no-deps` because all deps are listed in poetry.lock and then exported to requirements.txt.
+    # Also, without using `--no-deps` caused an issue with the versioning of git deps (datetime-utils and strava-client).
+    pipCmdExtraArgs: ["--no-cache-dir --no-deps"]
+
+
+# Raw CloudFormation template syntax, in YAML.
+# Docs: https://www.serverless.com/framework/docs/providers/aws/guide/resources.
+resources:
+  # Set the description in the CloudFormation stack.
+  Description: Managed by Serverless at ${self:custom.source}
+
+  Resources:
+
+    ####################################################################################
+    ##### DynamoDB task Table that triggers the Lambda
+    ####################################################################################
+
+    # DynamoDB task Table that triggers Botte Backend.
+    # Docs: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-dynamodb-table.html
+    DynamodbTaskTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ddbq-exp-task-${sls:stage}
+        AttributeDefinitions:
+          - AttributeName: "PK"
+            AttributeType: "S"
+          - AttributeName: "SK"
+            AttributeType: "S"
+          # Do NOT specify extra attrs here.
+        KeySchema:
+          - AttributeName: "PK"
+            KeyType: "HASH"
+          - AttributeName: "SK"
+            KeyType: "RANGE"
+        BillingMode: PAY_PER_REQUEST
+        StreamSpecification:
+            StreamViewType: NEW_IMAGE
+        TableClass: STANDARD
+        TimeToLiveSpecification:
+          AttributeName: ExpirationTs
+          Enabled: true
+        Tags:
+          - Key: project
+            Value: ${self:provider.tags.project}
+          - Key: environment
+            Value: ${self:provider.tags.environment}
+          - Key: managed-with
+            Value: ${self:provider.tags.managed-with}
+          - Key: monorepo
+            Value: ${self:provider.tags.monorepo}
+          - Key: source
+            Value: ${self:provider.tags.source}
+
+    ####################################################################################
+    ##### S3 Bucket where the Lambdas write files
+    ####################################################################################
+
+    S3Bucket:
+      # Docs: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-s3-bucket.html
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ddbq-exp

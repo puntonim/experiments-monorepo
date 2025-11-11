@@ -1,4 +1,4 @@
-PYTHON_VERSION:="3.13.7"
+PYTHON_VERSION:="3.13"
 
 .PHONY: default
 default: test ;
@@ -8,7 +8,7 @@ default: test ;
 poetry-create-env:
 	pyenv local $(PYTHON_VERSION) # It creates `.python-version`, to be git-ignored.
 	poetry env use $$(pyenv which python) # It creates the env via pyenv.
-	poetry install
+	poetry install --all-extras
 
 
 .PHONY : poetry-destroy-env
@@ -28,7 +28,7 @@ pyclean:
 	rm -rf *.egg-info build
 	rm -rf coverage.xml .coverage
 	find . -name .pytest_cache -type d -exec rm -rf "{}" +
-	find . -name __pycache__ -type d -exec rm -rf "{}" +	
+	find . -name __pycache__ -type d -exec rm -rf "{}" +
 
 
 .PHONY : clean
@@ -49,20 +49,38 @@ pip-uninstall-all:
 	pip freeze | pip uninstall -y -r /dev/stdin
 
 
+.PHONY : deploy
+deploy:
+	sls deploy
+
+
+.PHONY : deploy-remove
+deploy-remove:
+	sls remove
+
+
 .PHONY : test
 test:
 	# poetry run pytest -s tests/ -v -n auto --durations=3
 	# Without poetry, the startup time is less, but you need to activate the env first.
 	pytest -s tests/ -v -n auto --durations=3
-	
+
 
 .PHONY : format
 format:
-	isort .
-	black .
+	# When running Ruff's linter with --fix, do it before the formatter.
+	ruff check --fix
+	ruff format
+
+
+.PHONY : format
+format/%:
+	# When running Ruff's linter with --fix, do it before the formatter.
+	ruff check --fix $*
+	ruff format $*
 
 
 .PHONY : format-check
 format-check:
-	isort --check-only .
-	black --check .
+	ruff check
+	ruff format --check

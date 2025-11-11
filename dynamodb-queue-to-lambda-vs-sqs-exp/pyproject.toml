@@ -1,0 +1,68 @@
+[project]
+name = "ddbq-exp"
+description = "Experiments Monorepo: DynamoDB Queue to Lambda experiment (vs SQS)"
+authors = [
+    {name = "puntonim", email = "puntonim@gmail.com"}
+]
+readme = "README.md"
+license = "no license"
+version = "1.0.0"
+requires-python = ">=3.13,<4"  # <4 required only by aws-lambda-powertools.
+dependencies = [
+    "aws-utils @ git+https://github.com/puntonim/utils-monorepo#subdirectory=aws-utils",
+    "svix-ksuid (>=0.6.2,<0.7.0)",
+    "datetime-utils @ git+https://github.com/puntonim/utils-monorepo#subdirectory=datetime-utils",
+    "mypy-boto3-s3 (>=1.40.61,<2.0.0)",
+]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[dependency-groups]
+dev = [
+    "aws-lambda-powertools[aws-sdk] (>=3.22.0,<4.0.0)",
+    "botocore (==1.40.4)",  # Must be the same as in AWS Lambda Python runtime.
+    "boto3 (==1.40.4)",  # Must be the same as in AWS Lambda Python runtime.
+    "ipdb (>=0.13.13)",
+    # Python linter and formatter.
+    "ruff (==0.14.2)",  # Must be the same as in .pre-commit-config.yaml.
+    # Serverless with Python support uses `poetry export` command which is not available
+    #  anymore in recent versions of Poetry. `poetry-plugin-export` solves this.
+    # https://github.com/oss-review-toolkit/ort/issues/10642
+    "poetry-plugin-export (>=1.9.0,<2.0.0)",
+]
+test = [
+    "pytest (>=8.4.2,<9.0.0)",
+    "pytest-xdist[psutil] (>=3.8.0,<4.0.0)",
+]
+producers = [
+    "aws-dynamodb-client @ git+https://github.com/puntonim/clients-monorepo#subdirectory=aws-dynamodb-client"
+]
+
+[tool.ruff]
+line-length = 88  # Default.
+extend-exclude = ["docs"]
+
+[tool.ruff.format]
+quote-style = "double"  # Default.
+
+[tool.ruff.lint]
+select = [
+    # pycodestyle
+    "E",
+    # Pyflakes
+    "F",
+    # pyupgrade
+    "UP",
+    # flake8-bugbear
+    "B",
+    # flake8-simplify
+    "SIM",
+    # isort
+    "I",
+]
+ignore = [
+    # E501 Line too long: let the ruff formatter take care long lines.
+    "E501",
+]

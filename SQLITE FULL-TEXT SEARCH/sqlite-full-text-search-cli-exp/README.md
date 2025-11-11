@@ -1,9 +1,15 @@
+<p align="center">
+  <h1 align="center">
+    Experiments Monorepo: SQLite Full-Text Search CLI experiment
+  </h1>
+  <p align="center">
+    A CLI with SQLite and Peewee that implements full-text search in Italian and English.
+  <p>
+</p>
 
-# ** SQLITE FULL-TEXT SEARCH EXPERIMENT **
+<br>
 
-
-
-Index tables **with content** ot with **external-content**
+Index tables **with content** or with **external-content**
 ==========================================================
 
 Docs on external-content: https://sqlite.org/fts5.html#external_content_tables
